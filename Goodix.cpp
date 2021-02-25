@@ -6,11 +6,12 @@
 #endif
 
 // Interrupt handling
-volatile uint8_t goodixIRQ = 0;
+volatile bool goodixIRQ = false;
 
-void ICACHE_RAM_ATTR _goodix_irq_handler() {
+void IRAM_ATTR _goodix_irq_handler() {
   noInterrupts();
-  goodixIRQ = 1;
+  goodixIRQ = true;
+  //Serial.println("Touched!");
   interrupts();
 }
 
@@ -41,37 +42,23 @@ bool Goodix::begin(uint8_t interruptPin, uint8_t resetPin, uint8_t addr) {
 bool Goodix::reset() {
   msSleep(1);
 
-  pinOut(intPin);
-  pinOut(rstPin);
-
-  pinHold(intPin);
-  pinHold(rstPin);
-
-  /* begin select I2C slave addr */
-
-  /* T2: > 10ms */
-  msSleep(11);
-
-  /* HIGH: 0x28/0x29 (0x14 7bit), LOW: 0xBA/0xBB (0x5D 7bit) */
-  pinSet(intPin, i2cAddr == GOODIX_I2C_ADDR_28);
-
-  /* T3: > 100us */
-  usSleep(110);
-  pinIn(rstPin);
-  //if (!pinCheck(rstPin, HIGH))
-  //  return false;
-
-  /* T4: > 5ms */
-  msSleep(6);
-  pinHold(intPin);
-  /* end select I2C slave addr */
-
-  /* T5: 50ms */
-  msSleep(51);
+  if (rstPin >= 0)
+  {
+  	pinOut(rstPin);
+  	pinHold(rstPin);
+  	/* T2: > 10ms */
+  	msSleep(11);
+  	/* T3: > 100us */
+  	usSleep(110);
+  	pinIn(rstPin);
+  	/* T4: > 5ms */
+  	msSleep(6);
+  	/* T5: 50ms */
+  	msSleep(51);
+  }
   pinIn(intPin); // INT pin has no pullups so simple set to floating input
 
   attachInterrupt(intPin, _goodix_irq_handler, RISING);
-  //  detachInterrupt(intPin, _goodix_irq_handler);
 
   return true;
 }
@@ -110,14 +97,14 @@ uint8_t Goodix::calcChecksum(uint8_t* buf, uint8_t len) {
   for (uint8_t i = 0; i < len; i++) {
     ccsum += buf[i];
   }
-  //ccsum %= 256;
+
   ccsum = (~ccsum) + 1;
   return ccsum;
 }
 
 uint8_t Goodix::readChecksum() {
   uint16_t aStart = GT_REG_CFG;
-  uint16_t aStop = 0x80FE;
+  uint16_t aStop = GOODIX_REG_CONFIG_END;
   uint8_t len = aStop - aStart + 1;
   uint8_t buf[len];
 
@@ -125,19 +112,110 @@ uint8_t Goodix::readChecksum() {
   return calcChecksum(buf, len);
 }
 
-uint8_t Goodix::fwResolution(uint16_t maxX, uint16_t maxY) {
-  uint8_t len = 0x8100 - GT_REG_CFG + 1;
-  uint8_t cfg[len];
-  read(GT_REG_CFG, cfg, len);
+uint8_t Goodix::configCheck(bool configVersion) {
+	
+	uint8_t len1 = GOODIX_REG_CONFIG_MIDDLE - GOODIX_REG_CONFIG_DATA +1;
+	uint8_t len2 = GOODIX_REG_CONFIG_END - GOODIX_REG_CONFIG_MIDDLE;
+	uint8_t buf1[len1];
+	uint8_t buf2[len2];
+	uint8_t buf[len1+len2];
+	uint8_t diff = 0;
+	uint8_t calc_check_sum;
+	uint8_t read_check_sum[1];
+	char prodID[5];
+	
+	uint8_t config0[] = {
+        0x5F, 0x40, 0x01, 0xE0, 0x01, 0x05, 0x35, 0x00, 0x01, 0x08,
+        0x1E, 0x0F, 0x50, 0x32, 0x03, 0x05, 0x00, 0x00, 0x00, 0x00,
+        0x22, 0x22, 0x00, 0x18, 0x1B, 0x1E, 0x14, 0x87, 0x27, 0x0A,
+        0x3C, 0x3E, 0x0C, 0x08, 0x00, 0x00, 0x00, 0x9B, 0x02, 0x1C,
+        0x00, 0x01, 0x05, 0x00, 0x00, 0x00, 0x00, 0x09, 0x11, 0x00,
+        0x00, 0x28, 0x6E, 0x94, 0xC5, 0x02, 0x00, 0x00, 0x00, 0x04,
+        0xAB, 0x2C, 0x00, 0x8D, 0x36, 0x00, 0x75, 0x42, 0x00, 0x61,
+        0x51, 0x00, 0x51, 0x63, 0x00, 0x51, 0x00, 0x00, 0x00, 0x00,
+        0xF0, 0x4A, 0x3A, 0xFF, 0xFF, 0x27, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x14, 0x12, 0x10, 0x0E, 0x0C, 0x0A, 0x08, 0x06,
+        0x04, 0x02, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x02, 0x04, 0x06, 0x08, 0x0A, 0x0C, 0x24,
+        0x22, 0x21, 0x20, 0x1F, 0x1E, 0x1D, 0xFF, 0xFF, 0xFF, 0xFF,
+        0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0xBE, 0x01
+    };
 
-  cfg[1] = (maxX & 0xff);
-  cfg[2] = (maxX >> 8);
-  cfg[3] = (maxY & 0xff);
-  cfg[4] = (maxY >> 8);
-  cfg[len - 2] = calcChecksum(cfg, len - 2);
-  cfg[len - 1] = 1;
+    write(GOODIX_REG_COMMAND, 0);
+    productID(prodID);
+    if (prodID[0] != '9')
+    {
+	    return (prodID[0]);
+    }
+    readBytes(GOODIX_REG_CONFIG_DATA, buf1, len1);
+    readBytes(GOODIX_REG_CONFIG_MIDDLE+1, buf2, len2);
+    memcpy(buf, buf1, sizeof(buf1));
+	memcpy(buf+sizeof(buf1), buf2, sizeof(buf2));	
+	calc_check_sum = calcChecksum(buf, len1+len2);
+	readBytes(GOODIX_REG_CONFIG_END+1, read_check_sum, 1);
+	
+	if (configVersion)
+	{
+		
+		for (uint8_t i=0; i<(len1+len2); i++) {
+			if (config0[i] != buf[i])
+				{
+					diff++;
+				}
+		}
+	}
+	if (read_check_sum[0] != calc_check_sum)
+		{
+			diff++;
+		}
+	readBytes(GOODIX_REG_CONFIG_DATA, read_check_sum, 1);
+	return (diff);
+}
 
-  write(GT_REG_CFG, cfg, len);
+void Goodix::configUpdate() {
+	
+	uint8_t len1 = GOODIX_REG_CONFIG_MIDDLE - GOODIX_REG_CONFIG_DATA +1;
+	uint8_t len2 = GOODIX_REG_CONFIG_END - GOODIX_REG_CONFIG_MIDDLE;
+	uint8_t buf[2];
+	char prodID[5];
+
+	uint8_t config0[] = {
+        0x5F, 0x40, 0x01, 0xE0, 0x01, 0x05, 0x35, 0x00, 0x01, 0x08,
+        0x1E, 0x0F, 0x50, 0x32, 0x03, 0x05, 0x00, 0x00, 0x00, 0x00,
+        0x22, 0x22, 0x00, 0x18, 0x1B, 0x1E, 0x14, 0x87, 0x27, 0x0A,
+        0x3C, 0x3E, 0x0C, 0x08, 0x00, 0x00, 0x00, 0x9B, 0x02, 0x1C,
+        0x00, 0x01, 0x05, 0x00, 0x00, 0x00, 0x00, 0x09, 0x11, 0x00,
+        0x00, 0x28, 0x6E, 0x94, 0xC5, 0x02, 0x00, 0x00, 0x00, 0x04,
+        0xAB, 0x2C, 0x00, 0x8D, 0x36, 0x00, 0x75, 0x42, 0x00, 0x61,
+        0x51, 0x00, 0x51, 0x63, 0x00, 0x51, 0x00, 0x00, 0x00, 0x00,
+        0xF0, 0x4A, 0x3A, 0xFF, 0xFF, 0x27, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x14, 0x12, 0x10, 0x0E, 0x0C, 0x0A, 0x08, 0x06,
+        0x04, 0x02, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x02, 0x04, 0x06, 0x08, 0x0A, 0x0C, 0x24,
+        0x22, 0x21, 0x20, 0x1F, 0x1E, 0x1D, 0xFF, 0xFF, 0xFF, 0xFF,
+        0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0xBE, 0x01
+    };
+    
+    buf[0] = calcChecksum(config0, len1+len2);
+    buf[1] = 0x01;
+    write(GOODIX_REG_COMMAND, 0);
+    productID(prodID);
+    if (prodID[0] != '9')
+    {
+	    return;
+    }
+    writeBytes(GOODIX_REG_CONFIG_DATA, config0, len1+len2);
+    writeBytes(GOODIX_REG_CONFIG_END+1, buf, 2);
 }
 
 GTConfig* Goodix::readConfig() {
@@ -155,97 +233,66 @@ void Goodix::armIRQ() {
 }
 
 void Goodix::onIRQ() {
-  //uint8_t buf[1 + GOODIX_CONTACT_SIZE * GOODIX_MAX_CONTACTS];
-  int8_t contacts;
+  int16_t contacts;
 
-  contacts = readInput(points);
-  if (contacts < 0)
-    return;
+  contacts = readInput(rawdata);
+  
+  	if (contacts < 0)
+  	{
+	  	return;
+  	}
+  	
+    if (contacts > 0) {
+    
+    finaldata[0].x = ((uint16_t)rawdata[3] << 8) + rawdata[2];
+    finaldata[0].y = ((uint16_t)rawdata[5] << 8) + rawdata[4];
+    
+    finaldata[1].x = ((uint16_t)rawdata[11] << 8) + rawdata[10];
+    finaldata[1].y = ((uint16_t)rawdata[13] << 8) + rawdata[12];
 
-  if (contacts > 0) {
-    touchHandler(contacts, (GTPoint *)points);
-    /*
-        Serial.print("Contacts: ");
-        Serial.println(contacts);
+    finaldata[2].x = ((uint16_t)rawdata[19] << 8) + rawdata[18];
+    finaldata[2].y = ((uint16_t)rawdata[21] << 8) + rawdata[20];
 
-        for (uint8_t i = 0; i < contacts; i++) {
-          Serial.print("C ");
-          Serial.print(i);
-          Serial.print(": #");
-          Serial.print(points[i].trackId);
-          Serial.print(" ");
-          Serial.print(points[i].x);
-          Serial.print(", ");
-          Serial.print(points[i].y);
-          Serial.print(" s.");
-          Serial.print(points[i].size);
-          Serial.println();
-        }
-    */
-  }
+    finaldata[3].x = ((uint16_t)rawdata[27] << 8) + rawdata[26];
+    finaldata[3].y = ((uint16_t)rawdata[29] << 8) + rawdata[28];
 
-  //Serial.println(&points[1 + GOODIX_CONTACT_SIZE * i]);
-  // goodix_ts_report_touch(&points[1 + GOODIX_CONTACT_SIZE * i]);
-
-  write(GOODIX_READ_COORD_ADDR, 0);
-  /*struct goodix_ts_data *ts = dev_id;
-
-    goodix_process_events(ts);
-
-    write(GOODIX_READ_COORD_ADDR, 0);
-    //if (write(GOODIX_READ_COORD_ADDR, 0) < 0)
-    //  dev_err(&ts->client->dev, "I2C write end_cmd error\n");
-
-    return IRQ_HANDLED;
-  */
+    finaldata[4].x = ((uint16_t)rawdata[35] << 8) + rawdata[34];
+    finaldata[4].y = ((uint16_t)rawdata[37] << 8) + rawdata[36]; 
+    
+    touchHandler(contacts, finaldata);
+	}
+	write(GOODIX_READ_COORD_ADDR, 0);
 }
 
 void Goodix::loop() {
   noInterrupts();
-  uint8_t irq = goodixIRQ;
-  goodixIRQ = 0;
+  bool irq = goodixIRQ;
+  goodixIRQ = false;
   interrupts();
 
   if (irq) {
     onIRQ();
   }
 }
+
 #define EAGAIN 100 // Try again error
 
-int16_t Goodix::readInput(uint8_t *data) {
+int16_t Goodix::readInput(uint8_t *regState) {
   int touch_num;
   int error;
 
-  uint8_t regState[1];
+  error = readBytes(GOODIX_READ_COORD_ADDR, regState, GOODIX_CONTACT_SIZE * GOODIX_MAX_CONTACTS);
+  touch_num = regState[0] & 0xF;
 
-  error = read(GOODIX_READ_COORD_ADDR, regState, 1);
-  //log_printf("regState: %#06x\n", regState);
-
-  if (error) {
-    //dev_err(&ts->client->dev, "I2C transfer error: %d\n", error);
+  if (!error) {
     return -error;
   }
 
   if (!(regState[0] & 0x80))
+  {
     return -EAGAIN;
-
-  touch_num = regState[0] & 0x0f;
-  //if (touch_num > ts->max_touch_num)
-  //  return -EPROTO;
-
-  //log_printf("touch num: %d\n", touch_num);
-
-  if (touch_num > 0) {
-    /*    data += 1 + GOODIX_CONTACT_SIZE;
-        error = read(GOODIX_READ_COORD_ADDR + 1 + GOODIX_CONTACT_SIZE, data,
-              GOODIX_CONTACT_SIZE * (touch_num - 1));
-    */
-    error = read(GOODIX_READ_COORD_ADDR + 1, data, GOODIX_CONTACT_SIZE * (touch_num));
-
-    if (error)
-      return -error;
-  }
-
+	}
+	
   return touch_num;
 }
 
@@ -285,6 +332,17 @@ uint8_t Goodix::write(uint16_t reg, uint8_t buf) {
   return Wire.endTransmission();
 }
 
+bool Goodix::writeBytes(uint16_t reg, uint8_t *data, int nbytes)
+{
+    Wire.beginTransmission(i2cAddr);
+    Wire.write(reg >> 8);
+    Wire.write(reg & 0xFF);
+    for (int i = 0; i < nbytes; i++) {
+        Wire.write(data[i]);
+    }
+    return (Wire.endTransmission() != 0);
+}
+
 uint8_t Goodix::read(uint16_t reg, uint8_t *buf, size_t len) {
   uint8_t res;
 
@@ -318,6 +376,22 @@ uint8_t Goodix::read(uint16_t reg, uint8_t *buf, size_t len) {
   }
   return 0;
 }
+
+bool Goodix::readBytes( uint16_t reg, uint8_t *data, int nbytes)
+{
+	Wire.beginTransmission(i2cAddr);
+    Wire.write(reg >> 8);
+    Wire.write(reg & 0xFF);
+    Wire.endTransmission();
+    Wire.requestFrom(i2cAddr, (uint8_t )nbytes);
+    int index = 0;
+    while (Wire.available())
+    {
+        data[index++] = Wire.read();
+    }
+    return (nbytes == index);
+}
+
 
 void Goodix::pinOut(uint8_t pin) {
   pinMode(pin, OUTPUT);

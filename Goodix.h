@@ -11,11 +11,11 @@
 // 0xBA/0xBB (0x5D 7bit)
 #define GOODIX_I2C_ADDR_BA  0x5D
 
-#define GOODIX_MAX_HEIGHT   4096
-#define GOODIX_MAX_WIDTH    4096
+#define GOODIX_MAX_HEIGHT   480
+#define GOODIX_MAX_WIDTH    320
 #define GOODIX_INT_TRIGGER    1
 #define GOODIX_CONTACT_SIZE   8
-#define GOODIX_MAX_CONTACTS   10
+#define GOODIX_MAX_CONTACTS   5
 
 #define GOODIX_CONFIG_MAX_LENGTH  240
 #define GOODIX_CONFIG_911_LENGTH  186
@@ -53,6 +53,9 @@
 // Number of debuffs fingers press/release
 #define GOODIX_REG_SHAKE_CNT    0x804F
 
+#define GOODIX_REG_CONFIG_MIDDLE    0x80A2
+#define GOODIX_REG_CONFIG_END    0x80FE
+
 // ReadOnly registers (device and coordinates info)
 // Product ID (LSB 4 bytes, GT9110: 0x06 0x00 0x00 0x09)
 #define GOODIX_REG_ID           0x8140
@@ -86,16 +89,14 @@
  * enabling GT911 to enter "Approach mode" and work as a transmitting terminal */
 #define GOODIX_CMD_HOTKNOT_TX   0x21
 
-#define RESOLUTION_LOC    1
-#define MAX_CONTACTS_LOC  5
-#define TRIGGER_LOC 6
 
 class Goodix {
   public:
     uint8_t i2cAddr;
     struct GTConfig config;
     struct GTInfo info;
-    uint8_t points[GOODIX_MAX_CONTACTS*GOODIX_CONTACT_SIZE]; //points buffer
+    struct GTPoint finaldata[GOODIX_MAX_CONTACTS]; //final points
+    uint8_t rawdata[GOODIX_MAX_CONTACTS * GOODIX_CONTACT_SIZE]; //points buffer
 
     Goodix();
 
@@ -108,12 +109,15 @@ class Goodix {
 
     uint8_t write(uint16_t reg, uint8_t *buf, size_t len);
     uint8_t write(uint16_t reg, uint8_t value);
+    bool writeBytes(uint16_t reg, uint8_t *data, int nbytes);
     uint8_t read(uint16_t reg, uint8_t *buf, size_t len);
+    bool readBytes(uint16_t reg, uint8_t *data, int nbytes);
 
     uint8_t calcChecksum(uint8_t* buf, uint8_t len);
     uint8_t readChecksum();
 
-    uint8_t fwResolution(uint16_t maxX, uint16_t maxY);
+    void configUpdate();
+    uint8_t configCheck(bool isLilyPi);
     
     GTConfig* readConfig();
     GTInfo* readInfo();
