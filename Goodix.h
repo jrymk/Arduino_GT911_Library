@@ -3,6 +3,7 @@
 
 #include <Arduino.h>
 #include "GoodixStructs.h"
+#include "GoodixFw.h"
 
 #define GOODIX_OK   0
 
@@ -40,7 +41,7 @@ class Goodix {
     uint8_t i2cAddr;
     struct GTConfig config;
     struct GTInfo info;
-    struct GTPoint finaldata[GOODIX_MAX_CONTACTS]; //final points
+    struct GTPoint points[GOODIX_MAX_CONTACTS]; //processed points
 
     Goodix();
 
@@ -57,7 +58,8 @@ class Goodix {
 
     uint8_t calcChecksum(uint8_t* buf, uint8_t len);
     uint8_t readChecksum();
-
+	
+    void fwResolution(uint16_t maxX, uint16_t maxY);
     void configUpdate();
     uint8_t configCheck(bool isLilyPi);
     
