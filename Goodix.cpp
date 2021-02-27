@@ -89,15 +89,11 @@ uint8_t Goodix::productID(char *target) {
 
   memcpy(target, buf, 4);
   target[4] = 0;
-  Serial.print("ProdID:");
-  Serial.println(target);
   return 0;
 }
 
 /**
    goodix_i2c_test - I2C test function to check if the device answers.
-
-   @client: the i2c client
 */
 uint8_t Goodix::test() {
   uint8_t testByte;
@@ -245,12 +241,9 @@ GTInfo* Goodix::readInfo() {
   return &info;
 }
 
-void Goodix::armIRQ() {
-  attachInterrupt(intPin, _goodix_irq_handler, RISING);
-}
-
 void Goodix::onIRQ() {
   int16_t contacts;
+  uint8_t rawdata[GOODIX_MAX_CONTACTS * GOODIX_CONTACT_SIZE]; //points buffer
 
   contacts = readInput(rawdata);
   
@@ -320,7 +313,6 @@ int16_t Goodix::readInput(uint8_t *regState) {
   {	  
     return -EAGAIN;
   }
-
 
   return touch_num;
 }

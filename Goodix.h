@@ -41,7 +41,6 @@ class Goodix {
     struct GTConfig config;
     struct GTInfo info;
     struct GTPoint finaldata[GOODIX_MAX_CONTACTS]; //final points
-    uint8_t rawdata[GOODIX_MAX_CONTACTS * GOODIX_CONTACT_SIZE]; //points buffer
 
     Goodix();
 
