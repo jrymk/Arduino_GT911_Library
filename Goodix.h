@@ -75,27 +75,14 @@ class Goodix {
     uint8_t intPin, rstPin;
     void (*touchHandler)(int8_t, GTPoint*);
 
-    void debugPin(uint8_t level);
-    void armIRQ();
     void onIRQ();
 
     //--- utils ---
     void usSleep(uint16_t microseconds);
     void msSleep(uint16_t milliseconds);
 
-    void pinIn(uint8_t pin);
-    void pinOut(uint8_t pin);
-    void pinSet(uint8_t pin, uint8_t level);
-
-    // Used with pulled-up lines, set pin mode to out, write LOW
-    void pinHold(uint8_t pin);
-
-    // Check pin level
-    bool pinCheck(uint8_t pin, uint8_t level);
-
+    // --- I2C helper ---
     void i2cStart(uint16_t reg);
-    void i2cRestart();
-    uint8_t i2cStop();
 };
 
 #endif

@@ -180,7 +180,7 @@ uint8_t Goodix::configCheck(bool configVersion) {
 	{
 		
 		for (uint8_t i=0; i<(len1+len2); i++) {
-			if (LilyGo_config[i] != buf[i])
+			if (LilyPi_config[i] != buf[i])
 				{
 					diff++;
 				}
@@ -200,7 +200,7 @@ void Goodix::configUpdate() {
 	uint8_t buf[2];
 	char prodID[5];
 
-    buf[0] = calcChecksum(LilyGo_config, len1+len2);
+    buf[0] = calcChecksum(LilyPi_config, len1+len2);
     buf[1] = 0x01;
     write(GOODIX_REG_COMMAND, 0);
     productID(prodID);
@@ -208,7 +208,7 @@ void Goodix::configUpdate() {
     {
 	    return;
     }
-    writeBytes(GOODIX_REG_CONFIG_DATA, LilyGo_config, len1+len2);
+    writeBytes(GOODIX_REG_CONFIG_DATA, LilyPi_config, len1+len2);
     writeBytes(GOODIX_REG_CONFIG_END+1, buf, 2);
 }
 
