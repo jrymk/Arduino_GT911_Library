@@ -1,18 +1,17 @@
 #include <Wire.h>
 #include "Goodix.h"
 
-// D5 D6 pins are defined on boards like WeMOS, You can redefine it to numeric values
+// pins below are defined on board LilyGo LilyPi, you can redefine it to the proper numeric values
 #define INT_PIN 34
 #define RST_PIN -1
-#define LILYGO_LILYPI true
+#define LILYGO_LILYPI false  //true only if config data is available
 
 Goodix touch = Goodix();
 
 void handleTouch(int8_t contacts, GTPoint* points) {
   Serial.printf("Contacts: %d\n", contacts);
   for (uint8_t i = 0; i < contacts; i++) {
-    Serial.printf("C%d: %d %d \n", i, points[i].x, points[i].y);
-    yield();
+    Serial.printf("C%d: %d %d \n", points[i].trackId, points[i].x, points[i].y);
   }
 }
 
@@ -50,7 +49,6 @@ void setup() {
 
   touch.setHandler(handleTouch);
   touchStart();
-  //touch.configUpdate();
 }
 
 void loop() {
