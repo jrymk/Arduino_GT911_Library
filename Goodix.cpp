@@ -51,20 +51,33 @@ bool Goodix::begin(uint8_t interruptPin, uint8_t resetPin, uint8_t addr) {
 bool Goodix::reset() {
   msSleep(1);
 
-  if (rstPin >= 0)
-  {
-  	pinMode(rstPin, OUTPUT);
-  	digitalWrite(rstPin, LOW);
-  	/* T2: > 10ms */
-  	msSleep(11);
-  	/* T3: > 100us */
-  	usSleep(110);
-  	pinMode(rstPin, INPUT);
-  	/* T4: > 5ms */
-  	msSleep(6);
-  	/* T5: 50ms */
-  	msSleep(51);
-  }
+  pinMode(intPin, OUTPUT);
+  pinMode(rstPin, OUTPUT);
+
+  digitalWrite(intPin, LOW);
+  digitalWrite(rstPin, LOW);
+
+  /* begin select I2C slave addr */
+
+  /* T2: > 10ms */
+  msSleep(11);
+
+  /* HIGH: 0x28/0x29 (0x14 7bit), LOW: 0xBA/0xBB (0x5D 7bit) */
+  digitalWrite(intPin, i2cAddr == GOODIX_I2C_ADDR_28);
+
+  /* T3: > 100us */
+  usSleep(110);
+  pinMode(rstPin, INPUT);
+  //if (!pinCheck(rstPin, HIGH))
+  //  return false;
+
+  /* T4: > 5ms */
+  msSleep(6);
+  digitalWrite(intPin, LOW);
+  /* end select I2C slave addr */
+
+  /* T5: 50ms */
+  msSleep(51);
   pinMode(intPin, INPUT); // INT pin has no pullups so simple set to floating input
 
   attachInterrupt(intPin, _goodix_irq_handler, RISING);
