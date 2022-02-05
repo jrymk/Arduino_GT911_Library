@@ -22,22 +22,28 @@ void _GT911_irq_handler()
   interrupts();
 }
 
-void GT911::setHandler(void (*handler)(int8_t, GTPoint *))
+bool GT911::begin(uint8_t interruptPin, uint8_t resetPin, uint8_t addr, void (*handler)(uint8_t, GTPoint *))
 {
   touchHandler = handler;
-}
 
-bool GT911::begin(uint8_t interruptPin, uint8_t resetPin, uint8_t addr)
-{
   intPin = interruptPin;
   rstPin = resetPin;
   i2cAddr = addr;
 
   delay(300);
   bool result = reset();
+  if (!result)
+    return false;
   delay(200);
 
-  return result;
+  Wire.beginTransmission(getI2CAddress());
+  if (!Wire.endTransmission())
+    return false;
+
+  readInfo();
+  readConfig();
+
+  return true;
 }
 
 bool GT911::reset()
@@ -46,8 +52,8 @@ bool GT911::reset()
 
   pinMode(intPin, OUTPUT);
   pinMode(rstPin, OUTPUT);
-
   digitalWrite(intPin, LOW);
+
   digitalWrite(rstPin, LOW);
 
   delay(11);
@@ -117,9 +123,7 @@ void GT911::loop()
   interrupts();
 
   if (irq)
-  {
     onIRQ();
-  }
 }
 
 uint8_t GT911::calcChecksum(uint8_t *buf, uint8_t len)
@@ -144,8 +148,6 @@ uint8_t GT911::configCheck()
 {
   uint8_t calc_check_sum;
   uint8_t read_check_sum[1];
-  char prodID[5];
-
   write(GT911_CMD, 0);
 
   calc_check_sum = calcChecksum((uint8_t *)&config, sizeof(config));

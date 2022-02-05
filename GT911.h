@@ -158,7 +158,7 @@ class GT911
   int16_t readInput(uint8_t *data);
 
   uint8_t intPin, rstPin;
-  void (*touchHandler)(int8_t, GTPoint *);
+  void (*touchHandler)(uint8_t, GTPoint *);
   void onIRQ();
   void i2cStart(uint16_t reg);
 
@@ -169,10 +169,8 @@ class GT911
 public:
   GT911();
 
-  void setHandler(void (*handler)(int8_t, GTPoint *));
-
   uint8_t getI2CAddress();
-  bool begin(uint8_t interruptPin, uint8_t resetPin, uint8_t addr = GT911_I2C_ADDR_BA);
+  bool begin(uint8_t interruptPin, uint8_t resetPin, uint8_t addr, void (*handler)(uint8_t, GTPoint *));
   bool reset();
   void loop();
 
