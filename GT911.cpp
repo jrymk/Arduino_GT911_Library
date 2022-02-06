@@ -1,5 +1,6 @@
 #include "GT911.h"
 #include "Wire.h"
+#include "../../include/debugger.h"
 
 #define EAGAIN 100         // Try again error
 #define I2C_READ_ERROR 155 // I2C read error
@@ -37,7 +38,7 @@ bool GT911::begin(uint8_t interruptPin, uint8_t resetPin, uint8_t addr, void (*h
   delay(200);
 
   Wire.beginTransmission(getI2CAddress());
-  if (!Wire.endTransmission())
+  if (Wire.endTransmission()) // 0: success
     return false;
 
   readInfo();
@@ -78,6 +79,9 @@ void GT911::onIRQ()
   uint8_t data[GT911_POINT_DATA_SIZE * GT911_POINT_COUNT + 1]; // point data buffer
   int16_t count = readInput(data);
 
+  if (count < 0)
+    return;
+
   switch (count)
   {
   case 5:
@@ -109,9 +113,9 @@ void GT911::onIRQ()
     points[0].x = ((uint16_t)data[3] << 8) + data[2];
     points[0].y = ((uint16_t)data[5] << 8) + data[4];
     points[0].size = ((uint16_t)data[7] << 8) + data[6];
-
-    touchHandler(count, points);
   }
+  touchHandler(count, points);
+
   return;
 }
 
@@ -144,18 +148,6 @@ uint8_t GT911::readChecksum()
   return calcChecksum(buf, len);
 }
 
-uint8_t GT911::configCheck()
-{
-  uint8_t calc_check_sum;
-  uint8_t read_check_sum[1];
-  write(GT911_CMD, 0);
-
-  calc_check_sum = calcChecksum((uint8_t *)&config, sizeof(config));
-  readBytes(GT911_CHKSUM, read_check_sum, 1);
-
-  return read_check_sum[0] == calc_check_sum;
-}
-
 uint16_t GT911::swapByte(uint16_t in)
 {
   return ((in & 0x00FF) << 8) + ((in & 0xFF00) >> 8);
@@ -176,6 +168,23 @@ GTConfig &GT911::getConfig()
   return config;
 }
 
+void GT911::printConfig()
+{
+  debugger::printBytes((uint8_t *)&config, sizeof(config));
+}
+
+uint8_t GT911::configCheck()
+{
+  uint8_t calc_check_sum;
+  uint8_t read_check_sum[1];
+  write(GT911_CMD, 0);
+
+  calc_check_sum = calcChecksum((uint8_t *)&config, sizeof(config));
+  readBytes(GT911_CHKSUM, read_check_sum, 1);
+
+  return read_check_sum[0] == calc_check_sum;
+}
+
 bool GT911::readConfig()
 {
   config.configVersion = 0;
@@ -190,22 +199,12 @@ bool GT911::readConfig()
   memcpy((uint8_t *)&config, buf1, sizeof(buf1));
   memcpy((uint8_t *)&config + sizeof(buf1), buf2, sizeof(buf2));
 
-  config.xResolution = swapByte(config.SWAPPEDxResolution);
-  config.yResolution = swapByte(config.SWAPPEDyResolution);
-  config.panelBitFreq = swapByte(config.SWAPPEDpanelBitFreq);
-  config.panelSensorTime = swapByte(config.SWAPPEDpanelSensorTime);
-
   return config.configVersion != 0;
 }
 
 void GT911::writeConfig()
 {
   // config.configVersion++;
-  config.SWAPPEDxResolution = swapByte(config.xResolution);
-  config.SWAPPEDyResolution = swapByte(config.yResolution);
-  config.SWAPPEDpanelBitFreq = swapByte(config.panelBitFreq);
-  config.SWAPPEDpanelSensorTime = swapByte(config.panelSensorTime);
-
   uint16_t len = GT911_CHKSUM - GT911_CFG;
   uint8_t checksum[2];
   checksum[0] = calcChecksum((uint8_t *)&config, len);
@@ -218,7 +217,9 @@ void GT911::writeConfig()
 int16_t GT911::readInput(uint8_t *dest)
 {
   bool result = readBytes(GT911_DATA, dest, GT911_POINT_DATA_SIZE * GT911_POINT_COUNT + 1);
-  int count = dest[0] & 0b00001111;
+  int16_t count = dest[0] & 0b00001111;
+
+  // debugger::printBytes(dest, GT911_POINT_DATA_SIZE * GT911_POINT_COUNT + 1);
 
   if (!result)
     return -I2C_READ_ERROR;

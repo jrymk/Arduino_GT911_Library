@@ -36,8 +36,10 @@ struct GTPoint
 struct GTConfig
 {
   uint8_t configVersion;              // 0x8047
-  uint16_t SWAPPEDxResolution;        // 0x8048
-  uint16_t SWAPPEDyResolution;        // 0x804A
+  uint8_t xResolutionLowByte;         // 0x8048
+  uint8_t xResolutionHighByte;        // 0x8049
+  uint8_t yResolutionLowByte;         // 0x804A
+  uint8_t yResolutionHighByte;        // 0x804B
   uint8_t touchCount;                 // 0x804C
   uint8_t moduleSwitch1;              // 0x804D
   uint8_t moduleSwitch2;              // 0x804E
@@ -65,8 +67,10 @@ struct GTConfig
   uint8_t sensorNum;                  // 0x8064
   uint8_t freqAFactor;                // 0x8065
   uint8_t freqBFactor;                // 0x8066
-  uint16_t SWAPPEDpanelBitFreq;       // 0x8067
-  uint16_t SWAPPEDpanelSensorTime;    // 0x8069
+  uint8_t panelBitFreqLowByte;        // 0x8067
+  uint8_t panelBitFreqHighByte;       // 0x8068
+  uint8_t panelSensorTimeLowByte;     // 0x8069
+  uint8_t panelSensorTimeHighByte;    // 0x806A
   uint8_t panelTxGain;                // 0x806B
   uint8_t panelRxGain;                // 0x806C
   uint8_t panelDumpShift;             // 0x806D
@@ -139,10 +143,6 @@ struct GTConfig
   uint8_t ncg2[16];                   // 0x80C5 - 0x80D4 (142)
   uint8_t driver[26];                 // 0x80D5 - 0x80EE (168)
   uint8_t ncg3[16];                   // 0x80EF - 0x80FE (184)
-  uint16_t xResolution;
-  uint16_t yResolution;
-  uint16_t panelBitFreq;
-  uint16_t panelSensorTime;
 };
 
 class GT911
@@ -174,13 +174,13 @@ public:
   bool reset();
   void loop();
 
-  // checks if local config checksum matches device checksum. true is good
-  uint8_t configCheck();
-
   GTInfo &getInfo();
   bool readInfo();
 
   GTConfig &getConfig();
+  void printConfig();
+  // checks if local config checksum matches device checksum. true is good
+  uint8_t configCheck();
   bool readConfig();
   void writeConfig();
 };
